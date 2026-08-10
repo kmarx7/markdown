@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>macOS Markdown Clipboard Formatter Simulator</title>
+  <style>
+    :root {
+      --mac-bg-active: #007aff;
+      --mac-menu-bg: rgba(30, 30, 30, 0.75);
+      --mac-menu-border: rgba(255, 255, 255, 0.15);
+      --mac-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--mac-font);
+      background: radial-gradient(circle at 20% 30%, #5c2c77, transparent 50%),
+                  radial-gradient(circle at 80% 70%, #1a4d80, transparent 50%),
+                  #0f0f15;
+      background-size: cover;
+      height: 100vh;
+      overflow: hidden;
+      color: #ffffff;
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* macOS Menu Bar */
+    .menu-bar {
+      height: 24px;
+      background: rgba(20, 20, 20, 0.4);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 1000;
+    }
+
+    .menu-left, .menu-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .menu-item {
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .menu-item:hover, .menu-item.active {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .menu-apple {
+      font-size: 15px;
+    }
+
+    /* Dropdown Menu */
+    .dropdown {
+      position: absolute;
+      top: 28px;
+      left: 60px; /* Aligned near the MD app icon */
+      width: 240px;
+      background: var(--mac-menu-bg);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      border: 1px solid var(--mac-menu-border);
+      border-radius: 6px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      padding: 4px;
+      display: none;
+      flex-direction: column;
+      z-index: 1001;
+      animation: menuFadeIn 0.15s ease-out;
+    }
+
+    @keyframes menuFadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .dropdown.show {
+      display: flex;
+    }
+
+    .dropdown-title {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+      padding: 6px 12px;
+      font-weight: 600;
+    }
+
+    .dropdown-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 4px 6px;
+    }
+
+    .dropdown-item {
+      padding: 6px 12px;
+      font-size: 13px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .dropdown-item:hover {
+      background: var(--mac-bg-active);
+      color: #ffffff;
+    }
+
+    .dropdown-item .check {
+      font-weight: bold;
+      visibility: hidden;
+    }
+
+    .dropdown-item.checked .check {
+      visibility: visible;
+    }
+
+    .dropdown-item .shortcut {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+    }
+    .dropdown-item:hover .shortcut {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    /* Main Desktop Area */
+    .desktop {
+      flex: 1;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+    }
+
+    .window-container {
+      display: flex;
+      flex: 1;
+      background: rgba(20, 20, 25, 0.6);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+
+    /* Split Windows */
+    .editor-section, .preview-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .editor-section {
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .window-header {
+      height: 44px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.15);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .window-dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .dot.red { background: #ff5f56; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #27c93f; }
+
+    .window-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* Input Editor */
+    .markdown-input-container {
+      flex: 1;
+      position: relative;
+    }
+
+    .markdown-input {
+      width: 100%;
+      height: 100%;
+      background: #18191f;
+      border: none;
+      outline: none;
+      resize: none;
+      color: #f8f8f2;
+      font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 20px;
+      user-select: text;
+    }
+
+    /* Output Preview */
+    .preview-container {
+      flex: 1;
+      background: #f4f5f7;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      justify-content: center;
+    }
+
+    .pages-document {
+      background: #ffffff;
+      width: 100%;
+      max-width: 600px;
+      min-height: 100%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      border-radius: 4px;
+      padding: 40px;
+      color: #1a1a1a;
+      user-select: text;
+    }
+
+    /* Converted HTML Typography */
+    .pages-document h1 {
+      font-size: 24px;
+      border-bottom: 1px solid #eaecef;
+      padding-bottom: 8px;
+      margin-top: 20px;
+      margin-bottom: 12px;
+      color: #111111;
+    }
+    .pages-document h2 {
+      font-size: 20px;
+      border-bottom: 1px solid #eaecef;
+      padding-bottom: 6px;
+      margin-top: 18px;
+      margin-bottom: 12px;
+      color: #222222;
+    }
+    .pages-document h3 {
+      font-size: 16px;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      color: #333333;
+    }
+    .pages-document p {
+      margin-bottom: 14px;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    .pages-document blockquote {
+      border-left: 4px solid #dfe2e5;
+      padding: 0 12px;
+      color: #6a737d;
+      background: #f6f8fa;
+      margin: 12px 0;
+    }
+    .pages-document ul, .pages-document ol {
+      margin-left: 20px;
+      margin-bottom: 14px;
+    }
+    .pages-document li {
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .pages-document code {
+      font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+      background: rgba(27,31,35,0.05);
+      color: #d63384;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .pages-document pre {
+      background: #282c34;
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 14px 0;
+    }
+    .pages-document pre code {
+      background: transparent;
+      color: #abb2bf;
+      padding: 0;
+      font-size: 12px;
+    }
+    .pages-document a {
+      color: #0366d6;
+      text-decoration: none;
+    }
+    .pages-document a:hover {
+      text-decoration: underline;
+    }
+
+    /* Highlight classes */
+    .keyword { color: #c678dd; font-weight: bold; }
+    .string { color: #98c379; }
+    .number { color: #d19a66; }
+    .comment { color: #5c6370; font-style: italic; }
+    .function { color: #61afef; }
+    .type { color: #e5c07b; }
+
+    /* Action bar at the bottom */
+    .action-bar {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .mac-btn {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(10px);
+      transition: all 0.2s ease;
+    }
+
+    .mac-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
+    }
+
+    .mac-btn.primary {
+      background: var(--mac-bg-active);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .mac-btn.primary:hover {
+      background: #0062cc;
+    }
+
+    /* macOS Notification Toasts */
+    .notification-center {
+      position: absolute;
+      top: 40px;
+      right: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 2000;
+      pointer-events: none;
+    }
+
+    .notification {
+      width: 320px;
+      background: rgba(35, 35, 40, 0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      color: #ffffff;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      display: flex;
+      gap: 12px;
+      pointer-events: auto;
+      transform: translateX(360px);
+      transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    .notification.show {
+      transform: translateX(0);
+    }
+
+    .notification-icon {
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .notification-content {
+      flex: 1;
+    }
+
+    .notification-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .notification-body {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.4;
+    }
+
+    /* Shutdown screen overlay */
+    .shutdown-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: black;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .shutdown-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255,255,255,0.1);
+      border-left-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Menu Bar -->
+  <header class="menu-bar">
+    <div class="menu-left">
+      <div class="menu-item menu-apple"></div>
+      <div class="menu-item active" id="appMenuButton">📝 Format</div>
+      <div class="menu-item">파일</div>
+      <div class="menu-item">편집</div>
+      <div class="menu-item">도움말</div>
+    </div>
+    <div class="menu-right">
+      <div class="menu-item" style="gap: 8px;">
+        <span>🔋 100%</span>
+        <span>📶</span>
+        <span id="macTime">11:26 AM</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Dropdown Menu -->
+  <div class="dropdown" id="appDropdown">
+    <div class="dropdown-title">Markdown Formatter</div>
+    <div class="dropdown-divider"></div>
+    <div class="dropdown-item checked" id="toggleEnabled">
+      <span>Enable Automatic Formatting</span>
+      <span class="check">✓</span>
+    </div>
+    <div class="dropdown-item checked" id="toggleAutoDetect">
+      <span>Auto-Detect Markdown Syntax</span>
+      <span class="check">✓</span>
+    </div>
+    <div class="dropdown-item checked" id="toggleNotifications">
+      <span>Show Toast Notifications</span>
+      <span class="check">✓</span>
+    </div>
+    <div class="dropdown-divider"></div>
+    <div class="dropdown-item" id="formatNowButton">
+      <span>Format Clipboard Now</span>
+      <span class="shortcut">⌘F</span>
+    </div>
+    <div class="dropdown-divider"></div>
+    <div class="dropdown-item" id="quitButton">
+      <span>Quit</span>
+      <span class="shortcut">⌘Q</span>
+    </div>
+  </div>
+
+  <!-- Main desktop -->
+  <main class="desktop">
+    
+    <div class="window-container">
+      <!-- Left Panel: Input Editor -->
+      <section class="editor-section">
+        <header class="window-header">
+          <div class="window-dots">
+            <div class="dot red"></div>
+            <div class="dot yellow"></div>
+            <div class="dot green"></div>
+          </div>
+          <div class="window-title">입력: 마크다운 텍스트 (Markdown Plain Text)</div>
+          <div style="width: 52px;"></div>
+        </header>
+        <div class="markdown-input-container">
+          <textarea class="markdown-input" id="markdownInput" placeholder="이곳에 마크다운을 입력하세요..."># macOS 마크다운 변환기 시뮬레이터
+
+이 페이지는 클립보드 자동 변환 유틸리티를 브라우저에서 체험할 수 있는 시뮬레이터입니다.
+
+## 기능 리스트
+- **실시간 서식 변환**: 복사 시 HTML/RTF로 즉시 재포맷팅
+- *자동 감지*: 클립보드 안의 마크다운 구문을 스스로 식별
+- 코드 구문 강조: 다크 테마 기반 코드 서식 제공
+
+> 마크다운 텍스트를 Pages나 Word 등에 붙여넣을 때 서식이 그대로 유지됩니다!
+
+### 코드 블록 예시 (Swift)
+```swift
+import Cocoa
+
+func formatClipboard() {
+    let pasteboard = NSPasteboard.general
+    print("클립보드 서식 복사 완료!")
+}
+```
+
+더 자세한 정보는 [깃허브 저장소](https://github.com/kmarx7/markdown)를 확인해 보세요.</textarea>
+        </div>
+      </section>
+
+      <!-- Right Panel: Preview Area (Pages/Notes style) -->
+      <section class="preview-section">
+        <header class="window-header">
+          <div class="window-dots">
+            <div class="dot red"></div>
+            <div class="dot yellow"></div>
+            <div class="dot green"></div>
+          </div>
+          <div class="window-title">출력: 실제 복사본 서식 프리뷰 (Apple Pages Style)</div>
+          <div style="width: 52px;"></div>
+        </header>
+        <div class="preview-container">
+          <div class="pages-document" id="htmlPreview">
+            <!-- Rendered HTML will load here -->
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Bottom Actions -->
+    <div class="action-bar">
+      <button class="mac-btn primary" id="realCopyButton">
+        📋 서식 변환 후 클립보드 복사 (실제 붙여넣기 가능)
+      </button>
+    </div>
+
+    <!-- Slide-in Notification center -->
+    <div class="notification-center" id="notificationCenter"></div>
+  </main>
+
+  <!-- Shutdown screen overlay -->
+  <div class="shutdown-overlay" id="shutdownOverlay">
+    <div class="spinner"></div>
+    <p style="margin-top: 10px; font-weight: 500;">Markdown Formatter 종료 중...</p>
+  </div>
+
+  <script>
+    // --- State Variables ---
+    let isEnabled = true;
+    let autoDetect = true;
+    let notifyOnChange = true;
+    
+    const markdownInput = document.getElementById('markdownInput');
+    const htmlPreview = document.getElementById('htmlPreview');
+    const appMenuButton = document.getElementById('appMenuButton');
+    const appDropdown = document.getElementById('appDropdown');
+    const notificationCenter = document.getElementById('notificationCenter');
+    const realCopyButton = document.getElementById('realCopyButton');
+    const formatNowButton = document.getElementById('formatNowButton');
+    
+    // Toggle Settings
+    const toggleEnabledBtn = document.getElementById('toggleEnabled');
+    const toggleAutoDetectBtn = document.getElementById('toggleAutoDetect');
+    const toggleNotificationsBtn = document.getElementById('toggleNotifications');
+    const quitButton = document.getElementById('quitButton');
+    const shutdownOverlay = document.getElementById('shutdownOverlay');
+
+    // System Time Clock
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours();
+      let minutes = now.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      minutes = minutes < 10 ? '0'+minutes : minutes;
+      document.getElementById('macTime').innerText = `${hours}:${minutes} ${ampm}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Dropdown toggling
+    appMenuButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      appDropdown.classList.toggle('show');
+      appMenuButton.classList.toggle('active');
+    });
+
+    document.addEventListener('click', () => {
+      appDropdown.classList.remove('show');
+      appMenuButton.classList.remove('active');
+    });
+
+    appDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Checkbox Menu Items Action
+    toggleEnabledBtn.addEventListener('click', () => {
+      isEnabled = !isEnabled;
+      toggleEnabledBtn.classList.toggle('checked', isEnabled);
+      showToast("설정 변경", `자동 클립보드 서식 변환이 ${isEnabled ? '활성화' : '비활성화'} 되었습니다.`);
+      runProcessor(false);
+    });
+
+    toggleAutoDetectBtn.addEventListener('click', () => {
+      autoDetect = !autoDetect;
+      toggleAutoDetectBtn.classList.toggle('checked', autoDetect);
+      showToast("설정 변경", `마크다운 자동 감지가 ${autoDetect ? '활성화' : '비활성화'} 되었습니다.`);
+      runProcessor(false);
+    });
+
+    toggleNotificationsBtn.addEventListener('click', () => {
+      notifyOnChange = !notifyOnChange;
+      toggleNotificationsBtn.classList.toggle('checked', notifyOnChange);
+      showToast("설정 변경", `알림 배너 노출이 ${notifyOnChange ? '활성화' : '비활성화'} 되었습니다.`);
+    });
+
+    formatNowButton.addEventListener('click', () => {
+      appDropdown.classList.remove('show');
+      appMenuButton.classList.remove('active');
+      runProcessor(true);
+    });
+
+    quitButton.addEventListener('click', () => {
+      appDropdown.classList.remove('show');
+      appMenuButton.classList.remove('active');
+      shutdownOverlay.classList.add('active');
+      setTimeout(() => {
+        shutdownOverlay.innerHTML = '<p style="font-size: 16px; font-weight: 500;">앱이 종료되었습니다. 페이지를 새로고침하여 다시 켤 수 있습니다.</p>';
+      }, 1500);
+    });
+
+    // Toast Notification Dispatcher
+    function showToast(title, body) {
+      if (!notifyOnChange) return;
+      
+      const toast = document.createElement('div');
+      toast.className = 'notification';
+      toast.innerHTML = `
+        <div class="notification-icon">📝</div>
+        <div class="notification-content">
+          <div class="notification-title">${title}</div>
+          <div class="notification-body">${body}</div>
+        </div>
+      `;
+      notificationCenter.appendChild(toast);
+      
+      // Trigger slide-in
+      setTimeout(() => toast.classList.add('show'), 50);
+      
+      // Auto dismiss after 4 seconds
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 400);
+      }, 4000);
+    }
+
+    // --- Markdown to HTML Conversion Logic ---
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function isProbablyMarkdown(text) {
+      const lines = text.split('\n');
+      let indicators = 0;
+      let inCodeBlock = false;
+
+      for (let line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('```')) {
+          inCodeBlock = !inCodeBlock;
+          indicators++;
+          continue;
+        }
+        if (inCodeBlock) continue;
+
+        if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ') || trimmed.startsWith('#### ')) {
+          indicators++;
+        }
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('+ ')) {
+          indicators++;
+        }
+        if (trimmed.startsWith('> ')) {
+          indicators++;
+        }
+        
+        // Ordered List Check
+        if (/^\d+\.\s/.test(trimmed)) {
+          indicators++;
+        }
+      }
+
+      if (text.includes('`') && text.split('`').length >= 3) indicators++;
+      if (text.includes('**') && text.split('**').length >= 3) indicators++;
+      if (text.includes('__') && text.split('__').length >= 3) indicators++;
+      if (/\[[^\]]+\]\([^)]+\)/.test(text)) indicators++;
+
+      return indicators >= 1;
+    }
+
+    function parseInlineMarkdown(text) {
+      let result = text;
+      let codeBlocks = [];
+
+      // 1. Inline code: `code`
+      const codeRegex = /`([^`]+)`/g;
+      let match;
+      let matchCount = 0;
+      while ((match = codeRegex.exec(result)) !== null) {
+        codeBlocks.push(match[1]);
+        const token = `___INLINE_CODE_TOKEN_${matchCount}___`;
+        result = result.replace(match[0], token);
+        matchCount++;
+        codeRegex.lastIndex = 0; // Reset search position due to replacement
+      }
+
+      // 2. Links: [text](url) -> <a href="url" target="_blank">text</a>
+      result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+      // 3. Bold: **text** and __text__
+      result = result.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      result = result.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+
+      // 4. Italic: *text* and _text_
+      result = result.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      result = result.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+      // 5. Restore code tokens
+      for (let i = 0; i < codeBlocks.length; i++) {
+        const token = `___INLINE_CODE_TOKEN_${i}___`;
+        result = result.replace(token, `<code>${codeBlocks[i]}</code>`);
+      }
+
+      return result;
+    }
+
+    function highlightSyntax(code, language) {
+      if (!language || ['txt', 'text', 'plaintext', 'md', 'markdown'].includes(language)) {
+        return code;
+      }
+
+      let result = code;
+      let commentTokens = [];
+      let stringTokens = [];
+
+      // 1. Extract block comments
+      const blockCommentRegex = /\/\*[\s\S]*?\*\//g;
+      let bCount = 0;
+      result = result.replace(blockCommentRegex, (match) => {
+        commentTokens.push(match);
+        return `___BLOCK_COMMENT_TOKEN_${bCount++}___`;
+      });
+
+      // 2. Extract line comments
+      const isHashComment = ['python', 'py', 'sh', 'bash', 'yaml', 'yml', 'ruby', 'rb', 'dockerfile', 'makefile'].includes(language);
+      const lineCommentRegex = isHashComment ? /#.*$/gm : /\/\/.*$/gm;
+      let lCount = 0;
+      result = result.replace(lineCommentRegex, (match) => {
+        commentTokens.push(match);
+        return `___LINE_COMMENT_TOKEN_${lCount++}___`;
+      });
+
+      // 3. Extract strings
+      const stringRegex = /"([^"\\]|\\.)*"|'([^'\\]|\\.)*'/g;
+      let sCount = 0;
+      result = result.replace(stringRegex, (match) => {
+        stringTokens.push(match);
+        return `___STRING_TOKEN_${sCount++}___`;
+      });
+
+      // 4. Keywords List
+      const keywords = [
+        "func", "class", "struct", "enum", "protocol", "extension", "let", "var", "import", "return",
+        "if", "else", "switch", "case", "default", "for", "while", "do", "try", "catch", "throw", "throws",
+        "guard", "defer", "init", "self", "nil", "true", "false", "def", "from", "as", "and", "or", "not",
+        "in", "is", "lambda", "with", "yield", "pass", "break", "continue", "const", "function",
+        "async", "await", "public", "private", "fileprivate", "internal", "static", "final", "override",
+        "typealias", "associatedtype", "where", "package", "void", "int", "float", "double", "char",
+        "boolean", "null", "undefined", "print", "console", "log", "string", "number", "bool"
+      ];
+
+      // Sort longer keywords first
+      const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
+      for (let keyword of sortedKeywords) {
+        const regex = new RegExp(`\\b${keyword}\\b`, 'g');
+        result = result.replace(regex, `<span class="keyword">${keyword}</span>`);
+      }
+
+      // 5. Highlight Functions
+      const functionRegex = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g;
+      result = result.replace(functionRegex, `<span class="function">$1</span>`);
+
+      // 6. Highlight Capitalized Types/Classes
+      const typeRegex = /\b([A-Z][a-zA-Z0-9_]*)\b/g;
+      result = result.replace(typeRegex, (match) => {
+        if (['HTML', 'CSS', 'URL'].includes(match)) return match;
+        return `<span class="type">${match}</span>`;
+      });
+
+      // 7. Highlight Numbers
+      const numberRegex = /\b(\d+(?:\.\d+)?)\b/g;
+      result = result.replace(numberRegex, `<span class="number">$1</span>`);
+
+      // 8. Restore Strings
+      for (let i = 0; i < stringTokens.length; i++) {
+        result = result.replace(`___STRING_TOKEN_${i}___`, `<span class="string">${stringTokens[i]}</span>`);
+      }
+
+      // 9. Restore Comments
+      for (let i = 0; i < commentTokens.length; i++) {
+        result = result.replace(`___BLOCK_COMMENT_TOKEN_${i}___`, `<span class="comment">${commentTokens[i]}</span>`);
+        result = result.replace(`___LINE_COMMENT_TOKEN_${i}___`, `<span class="comment">${commentTokens[i]}</span>`);
+      }
+
+      return result;
+    }
+
+    function convertMarkdownToHtml(markdown) {
+      const lines = markdown.split('\n');
+      let htmlLines = [];
+      
+      let inCodeBlock = false;
+      let codeLanguage = '';
+      let codeLines = [];
+      
+      let listType = null;
+      let inBlockquote = false;
+      let paragraphLines = [];
+
+      function flushList() {
+        if (listType) {
+          htmlLines.push(`</${listType}>`);
+          listType = null;
+        }
+      }
+
+      function flushBlockquote() {
+        if (inBlockquote) {
+          htmlLines.push('</blockquote>');
+          inBlockquote = false;
+        }
+      }
+
+      function flushParagraph() {
+        if (paragraphLines.length > 0) {
+          const text = paragraphLines.join(' ');
+          const formatted = parseInlineMarkdown(escapeHtml(text));
+          htmlLines.push(`<p>${formatted}</p>`);
+          paragraphLines = [];
+        }
+      }
+
+      function flushAll() {
+        flushParagraph();
+        flushList();
+        flushBlockquote();
+      }
+
+      for (let rawLine of lines) {
+        const trimmed = rawLine.trim();
+
+        // 1. Code Block Processing
+        if (trimmed.startsWith('```')) {
+          if (inCodeBlock) {
+            inCodeBlock = false;
+            const codeText = codeLines.join('\n');
+            const escaped = escapeHtml(codeText);
+            const highlighted = highlightSyntax(escaped, codeLanguage);
+            htmlLines.push(`<pre><code class="language-${codeLanguage}">${highlighted}</code></pre>`);
+            codeLines = [];
+            codeLanguage = '';
+          } else {
+            flushAll();
+            inCodeBlock = true;
+            codeLanguage = trimmed.replace('```', '').trim().toLowerCase();
+          }
+          continue;
+        }
+
+        if (inCodeBlock) {
+          codeLines.push(rawLine);
+          continue;
+        }
+
+        // 2. Empty Line
+        if (trimmed === '') {
+          flushAll();
+          continue;
+        }
+
+        // 3. Headers
+        if (trimmed.startsWith('#')) {
+          let level = 0;
+          for (let char of trimmed) {
+            if (char === '#') level++;
+            else break;
+          }
+          if (level >= 1 && level <= 6 && trimmed.startsWith('#'.repeat(level) + ' ')) {
+            flushAll();
+            const headerText = trimmed.substring(level).trim();
+            const formatted = parseInlineMarkdown(escapeHtml(headerText));
+            htmlLines.push(`<h${level}>${formatted}</h${level}>`);
+            continue;
+          }
+        }
+
+        // 4. Blockquotes
+        if (trimmed.startsWith('>')) {
+          flushParagraph();
+          flushList();
+          if (!inBlockquote) {
+            inBlockquote = true;
+            htmlLines.push('<blockquote>');
+          }
+          const quoteText = trimmed.substring(1).trim();
+          const formatted = parseInlineMarkdown(escapeHtml(quoteText));
+          htmlLines.push(`<p>${formatted}</p>`);
+          continue;
+        } else {
+          flushBlockquote();
+        }
+
+        // 5. Unordered list
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('+ ')) {
+          flushParagraph();
+          if (listType !== 'ul') {
+            flushList();
+            listType = 'ul';
+            htmlLines.push('<ul>');
+          }
+          const itemText = trimmed.substring(2).trim();
+          const formatted = parseInlineMarkdown(escapeHtml(itemText));
+          htmlLines.push(`<li>${formatted}</li>`);
+          continue;
+        }
+
+        // 6. Ordered list
+        const olMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+        if (olMatch) {
+          flushParagraph();
+          if (listType !== 'ol') {
+            flushList();
+            listType = 'ol';
+            htmlLines.push('<ol>');
+          }
+          const itemText = olMatch[2];
+          const formatted = parseInlineMarkdown(escapeHtml(itemText));
+          htmlLines.push(`<li>${formatted}</li>`);
+          continue;
+        }
+
+        // 7. Paragraph accumulate
+        flushList();
+        paragraphLines.push(rawLine);
+      }
+
+      flushAll();
+      return htmlLines.join('\n');
+    }
+
+    // Wrap content inside the Pages mockup document preview
+    function updatePreview(htmlContent) {
+      htmlPreview.innerHTML = htmlContent;
+    }
+
+    // Global runner to process editor contents
+    function runProcessor(force = false) {
+      const rawText = markdownInput.value;
+
+      if (!isEnabled && !force) {
+        updatePreview(escapeHtml(rawText).replace(/\n/g, '<br>'));
+        return;
+      }
+
+      if (autoDetect && !force && !isProbablyMarkdown(rawText)) {
+        updatePreview(escapeHtml(rawText).replace(/\n/g, '<br>'));
+        return;
+      }
+
+      const htmlContent = convertMarkdownToHtml(rawText);
+      updatePreview(htmlContent);
+
+      if (force) {
+        showToast("수동 변환 실행", "클립보드가 수동 변환되었습니다.");
+      }
+    }
+
+    // Auto run on input edit
+    markdownInput.addEventListener('input', () => runProcessor(false));
+
+    // Initial render
+    runProcessor(false);
+
+    // --- Clipboard Writeback (Actual Copy rich text action) ---
+    realCopyButton.addEventListener('click', async () => {
+      const plainText = markdownInput.value;
+      const htmlContent = convertMarkdownToHtml(plainText);
+
+      // Wrapper HTML for Pages/Notes compatibility (containing embedded CSS style tag)
+      const fullHtmlString = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: -apple-system, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; }
+            h1 { font-size: 24px; border-bottom: 1px solid #eaecef; padding-bottom: 8px; color: #111; }
+            h2 { font-size: 20px; border-bottom: 1px solid #eaecef; padding-bottom: 6px; color: #222; }
+            h3 { font-size: 16px; color: #333; }
+            blockquote { border-left: 4px solid #dfe2e5; padding: 0 12px; color: #6a737d; background: #f6f8fa; margin: 12px 0; }
+            code { font-family: monospace; background: rgba(27,31,35,0.05); color: #d63384; padding: 2px 4px; border-radius: 3px; }
+            pre { background: #282c34; padding: 16px; border-radius: 6px; overflow-x: auto; color: #abb2bf; }
+            .keyword { color: #c678dd; font-weight: bold; }
+            .string { color: #98c379; }
+            .number { color: #d19a66; }
+            .comment { color: #5c6370; font-style: italic; }
+            .function { color: #61afef; }
+            .type { color: #e5c07b; }
+          </style>
+        </head>
+        <body>
+          ${htmlContent}
+        </body>
+        </html>
+      `;
+
+      try {
+        const textBlob = new Blob([plainText], { type: 'text/plain' });
+        const htmlBlob = new Blob([fullHtmlString], { type: 'text/html' });
+
+        const clipboardItem = new ClipboardItem({
+          'text/plain': textBlob,
+          'text/html': htmlBlob
+        });
+
+        await navigator.clipboard.write([clipboardItem]);
+        showToast("클립보드 저장 완료", "변환된 서식이 실제 시스템 클립보드에 복사되었습니다! Pages나 메모 앱에 붙여넣어 보세요.");
+      } catch (err) {
+        console.error("클립보드 접근 오류:", err);
+        // Fallback for simple copy
+        try {
+          await navigator.clipboard.writeText(plainText);
+          showToast("일반 텍스트 복사", "브라우저 권한 제한으로 일반 텍스트로만 복사되었습니다.");
+        } catch (e) {
+          showToast("복사 실패", "클립보드 복사 도중 에러가 발생했습니다.");
+        }
+      }
+    });
+  </script>
+</body>
+</html>
