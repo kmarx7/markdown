@@ -4,7 +4,7 @@ APP_BUNDLE = $(APP_NAME).app
 BIN_DIR = bin
 SRC = Sources/main.swift
 
-.PHONY: all build app run stop clean install
+.PHONY: all build app run stop clean install desktop
 
 all: build app
 
@@ -68,3 +68,10 @@ install: app stop
 	@cp -R $(APP_BUNDLE) ~/Applications/
 	@open ~/Applications/$(APP_BUNDLE)
 	@echo "✓ $(APP_NAME) installed and launched in ~/Applications!"
+
+# Copy and launch from the user's Desktop
+desktop: app stop
+	@rm -rf ~/Desktop/$(APP_BUNDLE)
+	@cp -R $(APP_BUNDLE) ~/Desktop/
+	@open ~/Desktop/$(APP_BUNDLE)
+	@echo "✓ $(APP_NAME) installed on your Desktop! You can now double-click it anytime."
