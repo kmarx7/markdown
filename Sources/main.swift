@@ -10,10 +10,127 @@ extension String {
 }
 
 // MARK: - App Delegate
+// MARK: - Custom Floating Window
+class ButtonWindow: NSWindow {
+    init(contentRect: NSRect) {
+        super.init(
+            contentRect: contentRect,
+            styleMask: [.borderless, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        self.isOpaque = false
+        self.backgroundColor = .clear
+        self.level = .floating // Float above normal windows
+        self.isMovableByWindowBackground = true // Drag by clicking anywhere on the button
+        self.hasShadow = true
+        self.setFrameAutosaveName("MarkdownFormatterWindow") // Remember position automatically
+    }
+    
+    override var canBecomeKey: Bool {
+        return true
+    }
+}
+
+// MARK: - Pill Button View
+class PillButtonView: NSView {
+    var isActive = true {
+        didSet {
+            updateAppearance()
+        }
+    }
+    
+    var onClick: (() -> Void)?
+    
+    private let titleLabel = NSTextField(labelWithString: "📝 MD Active")
+    private let gradientLayer = CAGradientLayer()
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupView()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupView()
+    }
+    
+    private func setupView() {
+        wantsLayer = true
+        layer?.cornerRadius = frame.height / 2
+        layer?.masksToBounds = true
+        
+        // Setup shadow for visual depth
+        layer?.shadowColor = NSColor.systemBlue.cgColor
+        layer?.shadowRadius = 8.0
+        layer?.shadowOpacity = 0.4
+        layer?.shadowOffset = CGSize(width: 0, height: 2)
+        
+        // Setup gradient layer
+        gradientLayer.frame = bounds
+        gradientLayer.colors = [
+            NSColor(red: 0.0, green: 0.48, blue: 1.0, alpha: 1.0).cgColor, // #007aff (Vibrant Blue)
+            NSColor(red: 0.63, green: 0.0, blue: 1.0, alpha: 1.0).cgColor  // #a100ff (Vibrant Purple)
+        ]
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0.5)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 0.5)
+        layer?.addSublayer(gradientLayer)
+        
+        // Setup label
+        titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .bold)
+        titleLabel.textColor = .white
+        titleLabel.alignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(titleLabel)
+        
+        NSLayoutConstraint.activate([
+            titleLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+        
+        updateAppearance()
+    }
+    
+    override func layout() {
+        super.layout()
+        gradientLayer.frame = bounds
+    }
+    
+    func updateAppearance() {
+        if isActive {
+            titleLabel.stringValue = "📝 MD Active"
+            titleLabel.textColor = .white
+            gradientLayer.isHidden = false
+            layer?.backgroundColor = nil
+            layer?.shadowColor = NSColor.systemBlue.cgColor
+        } else {
+            titleLabel.stringValue = "📝 MD Off"
+            titleLabel.textColor = NSColor.disabledControlTextColor
+            gradientLayer.isHidden = true
+            layer?.backgroundColor = NSColor.controlColor.cgColor
+            layer?.shadowColor = nil
+        }
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        // Tactile scale click animation
+        let animation = CABasicAnimation(keyPath: "transform.scale")
+        animation.fromValue = 1.0
+        animation.toValue = 0.92
+        animation.duration = 0.08
+        animation.autoreverses = true
+        layer?.add(animation, forKey: "click")
+        
+        onClick?()
+    }
+}
+
+// MARK: - App Delegate
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     
-    // Status Bar & Menu
-    var statusItem: NSStatusItem!
+    // UI Elements
+    var window: ButtonWindow!
+    var buttonView: PillButtonView!
     
     // Settings (Defaults)
     var isEnabled: Bool = true {
@@ -52,86 +169,59 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         autoDetect = UserDefaults.standard.bool(forKey: "autoDetect")
         notifyOnChange = UserDefaults.standard.bool(forKey: "notifyOnChange")
         
-        // Hide Dock icon completely (Pure status bar app)
+        // Hide Dock icon completely (Accessory app without a Dock icon)
         NSApp.setActivationPolicy(.accessory)
         
-        // Setup Status Item
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusItem.button {
-            if #available(macOS 11.0, *), let image = NSImage(systemSymbolName: "doc.richtext", accessibilityDescription: "Markdown Clipboard Formatter") {
-                button.image = image
-                button.image?.isTemplate = true
-            } else {
-                button.title = "📝"
-            }
+        // Setup Window size
+        let width: CGFloat = 160
+        let height: CGFloat = 50
+        
+        // Get primary screen visible rect
+        let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
+        let defaultRect = NSRect(
+            x: screenRect.maxX - width - 40,
+            y: screenRect.maxY - height - 40,
+            width: width,
+            height: height
+        )
+        
+        // Create window
+        window = ButtonWindow(contentRect: defaultRect)
+        
+        // Create button view
+        buttonView = PillButtonView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        buttonView.isActive = true // Starts active
+        buttonView.onClick = { [weak self] in
+            self?.toggleAppActiveState()
         }
         
-        buildMenu()
+        window.contentView = buttonView
+        window.makeKeyAndOrderFront(nil)
+        
         setupNotifications()
         
         // Initialize lastChangeCount & Start monitoring
         lastChangeCount = NSPasteboard.general.changeCount
         startClipboardMonitoring()
         
-        print("Markdown Clipboard Formatter successfully started in background status bar.")
+        print("Markdown Clipboard Formatter widget successfully launched on Desktop.")
     }
     
-    // MARK: - Menu Setup
-    func buildMenu() {
-        let menu = NSMenu()
-        
-        let titleItem = NSMenuItem(title: "Markdown Formatter", action: nil, keyEquivalent: "")
-        titleItem.isEnabled = false
-        menu.addItem(titleItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        let toggleItem = NSMenuItem(title: "Enable Automatic Formatting", action: #selector(toggleEnabled), keyEquivalent: "e")
-        toggleItem.state = isEnabled ? .on : .off
-        menu.addItem(toggleItem)
-        
-        let autoDetectItem = NSMenuItem(title: "Auto-Detect Markdown Syntax", action: #selector(toggleAutoDetect), keyEquivalent: "d")
-        autoDetectItem.state = autoDetect ? .on : .off
-        menu.addItem(autoDetectItem)
-        
-        let notifyItem = NSMenuItem(title: "Show Toast Notifications", action: #selector(toggleNotifications), keyEquivalent: "n")
-        notifyItem.state = notifyOnChange ? .on : .off
-        menu.addItem(notifyItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        let convertNowItem = NSMenuItem(title: "Format Clipboard Now", action: #selector(convertNow), keyEquivalent: "f")
-        menu.addItem(convertNowItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
-        menu.addItem(quitItem)
-        
-        statusItem.menu = menu
-    }
-    
-    @objc func toggleEnabled() {
-        isEnabled.toggle()
-        buildMenu()
-    }
-    
-    @objc func toggleAutoDetect() {
-        autoDetect.toggle()
-        buildMenu()
-    }
-    
-    @objc func toggleNotifications() {
-        notifyOnChange.toggle()
-        buildMenu()
-    }
-    
-    @objc func convertNow() {
-        processClipboard(force: true)
-    }
-    
-    @objc func quitApp() {
-        NSApp.terminate(nil)
+    func toggleAppActiveState() {
+        if isEnabled {
+            // Turn OFF & Exit
+            isEnabled = false
+            buttonView.isActive = false
+            
+            // Invalidate clipboard timer
+            monitorTimer?.invalidate()
+            monitorTimer = nil
+            
+            // Graceful exit after showing the "MD Off" state transition
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NSApp.terminate(nil)
+            }
+        }
     }
     
     // MARK: - Clipboard Monitor Loop
