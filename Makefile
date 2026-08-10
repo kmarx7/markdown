@@ -4,7 +4,7 @@ APP_BUNDLE = $(APP_NAME).app
 BIN_DIR = bin
 SRC = Sources/main.swift
 
-.PHONY: all build app run stop clean install
+.PHONY: all build app run stop clean install desktop
 
 all: build app
 
@@ -17,7 +17,9 @@ build:
 # Package as macOS App Bundle (.app)
 app: build
 	@mkdir -p $(APP_BUNDLE)/Contents/MacOS
+	@mkdir -p $(APP_BUNDLE)/Contents/Resources
 	@cp $(BIN_DIR)/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
+	@if [ -f Resources/AppIcon.icns ]; then cp Resources/AppIcon.icns $(APP_BUNDLE)/Contents/Resources/AppIcon.icns; fi
 	@echo '<?xml version="1.0" encoding="UTF-8"?>' > $(APP_BUNDLE)/Contents/Info.plist
 	@echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '<plist version="1.0">' >> $(APP_BUNDLE)/Contents/Info.plist
@@ -34,6 +36,8 @@ app: build
 	@echo '    <string>1.0</string>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <key>CFBundleVersion</key>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <string>1</string>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <key>CFBundleIconFile</key>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <string>AppIcon.icns</string>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <key>LSMinimumSystemVersion</key>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <string>10.15</string>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <key>LSUIElement</key>' >> $(APP_BUNDLE)/Contents/Info.plist
@@ -64,3 +68,10 @@ install: app stop
 	@cp -R $(APP_BUNDLE) ~/Applications/
 	@open ~/Applications/$(APP_BUNDLE)
 	@echo "✓ $(APP_NAME) installed and launched in ~/Applications!"
+
+# Copy and launch from the user's Desktop
+desktop: app stop
+	@rm -rf ~/Desktop/$(APP_BUNDLE)
+	@cp -R $(APP_BUNDLE) ~/Desktop/
+	@open ~/Desktop/$(APP_BUNDLE)
+	@echo "✓ $(APP_NAME) installed on your Desktop! You can now double-click it anytime."
