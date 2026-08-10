@@ -839,26 +839,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             overflow: auto;
             font-size: 85%;
             line-height: 1.45;
-            background-color: #282c34;
+            background-color: #f6f8fa;
+            border: 1px solid #e1e4e8;
             border-radius: 6px;
           }
           pre code {
             background-color: transparent;
             padding: 0;
             border-radius: 0;
-            color: #abb2bf;
+            color: #24292e;
             font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
           }
           a { color: #0366d6; text-decoration: none; }
           a:hover { text-decoration: underline; }
           
-          /* Syntax Highlighting CSS */
-          .keyword { color: #c678dd; font-weight: bold; }
-          .string { color: #98c379; }
-          .number { color: #d19a66; }
-          .comment { color: #5c6370; font-style: italic; }
-          .function { color: #61afef; }
-          .type { color: #e5c07b; }
+          /* Syntax Highlighting (Light Theme) */
+          .keyword { color: #d73a49; font-weight: bold; }
+          .string { color: #032f62; }
+          .number { color: #005cc5; }
+          .comment { color: #6a737d; font-style: italic; }
+          .function { color: #6f42c1; }
+          .type { color: #e36209; }
         </style>
         </head>
         <body>
