@@ -22,7 +22,7 @@ class ButtonWindow: NSWindow {
         self.isOpaque = false
         self.backgroundColor = .clear
         self.level = .floating // Float above normal windows
-        self.isMovableByWindowBackground = true // Drag by clicking anywhere on the button
+        self.isMovableByWindowBackground = false // We handle dragging manually to prevent click hijacking!
         self.hasShadow = true
         self.setFrameAutosaveName("MarkdownFormatterWindow") // Remember position automatically
     }
@@ -41,6 +41,10 @@ class PillButtonView: NSView {
     }
     
     var onClick: (() -> Void)?
+    
+    // Manual dragging and click tracking
+    private var initialLocation: NSPoint?
+    private var isDragging = false
     
     private let titleLabel = NSTextField(labelWithString: "📝 MD Active")
     private let gradientLayer = CAGradientLayer()
@@ -112,7 +116,12 @@ class PillButtonView: NSView {
         }
     }
     
+    // MARK: - Mouse Handlers for Dragging & Clicking
     override func mouseDown(with event: NSEvent) {
+        // Store click location relative to the window
+        initialLocation = event.locationInWindow
+        isDragging = false
+        
         // Tactile scale click animation
         let animation = CABasicAnimation(keyPath: "transform.scale")
         animation.fromValue = 1.0
@@ -120,8 +129,30 @@ class PillButtonView: NSView {
         animation.duration = 0.08
         animation.autoreverses = true
         layer?.add(animation, forKey: "click")
+    }
+    
+    override func mouseDragged(with event: NSEvent) {
+        guard let window = self.window, let initial = initialLocation else { return }
         
-        onClick?()
+        let mouseLocation = NSEvent.mouseLocation
+        let newOrigin = NSPoint(
+            x: mouseLocation.x - initial.x,
+            y: mouseLocation.y - initial.y
+        )
+        
+        // Set window origin position
+        window.setFrameOrigin(newOrigin)
+        isDragging = true
+    }
+    
+    override func mouseUp(with event: NSEvent) {
+        if !isDragging {
+            // It was a click (no dragging happened)
+            onClick?()
+        }
+        
+        initialLocation = nil
+        isDragging = false
     }
 }
 
