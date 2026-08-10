@@ -58,11 +58,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         // Setup Status Item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            if #available(macOS 11.0, *) {
-                button.image = NSImage(systemSymbolName: "doc.richtext", accessibilityDescription: "Markdown Clipboard Formatter")
+            if #available(macOS 11.0, *), let image = NSImage(systemSymbolName: "doc.richtext", accessibilityDescription: "Markdown Clipboard Formatter") {
+                button.image = image
                 button.image?.isTemplate = true
             } else {
-                button.title = "MD"
+                button.title = "📝"
             }
         }
         
