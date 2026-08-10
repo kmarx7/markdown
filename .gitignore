@@ -1,0 +1,6 @@
+# Build artifacts
+bin/
+MarkdownFormatter.app/
+
+# macOS files
+.DS_Store
