@@ -444,7 +444,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                     let escapedCode = escapeHtml(codeText)
                     let highlightedCode = highlightSyntax(escapedCode, language: codeLanguage)
                     
-                    htmlLines.append("<pre><code class=\"language-\(codeLanguage)\">\(highlightedCode)</code></pre>")
+                    htmlLines.append("""
+                    <table style="width: 100%; background-color: #f6f8fa; border: 1px solid #e1e4e8; border-collapse: collapse; margin: 14px 0;">
+                      <tr>
+                        <td style="padding: 16px; background-color: #f6f8fa;">
+                          <pre style="margin: 0; padding: 0; background: transparent; border: none; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 12px; color: #24292e; line-height: 1.45;">\(highlightedCode)</pre>
+                        </td>
+                      </tr>
+                    </table>
+                    """)
                     codeLines.removeAll()
                     codeLanguage = ""
                 } else {
