@@ -17,7 +17,9 @@ build:
 # Package as macOS App Bundle (.app)
 app: build
 	@mkdir -p $(APP_BUNDLE)/Contents/MacOS
+	@mkdir -p $(APP_BUNDLE)/Contents/Resources
 	@cp $(BIN_DIR)/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
+	@if [ -f Resources/AppIcon.icns ]; then cp Resources/AppIcon.icns $(APP_BUNDLE)/Contents/Resources/AppIcon.icns; fi
 	@echo '<?xml version="1.0" encoding="UTF-8"?>' > $(APP_BUNDLE)/Contents/Info.plist
 	@echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '<plist version="1.0">' >> $(APP_BUNDLE)/Contents/Info.plist
@@ -34,6 +36,8 @@ app: build
 	@echo '    <string>1.0</string>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <key>CFBundleVersion</key>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <string>1</string>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <key>CFBundleIconFile</key>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <string>AppIcon.icns</string>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <key>LSMinimumSystemVersion</key>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <string>10.15</string>' >> $(APP_BUNDLE)/Contents/Info.plist
 	@echo '    <key>LSUIElement</key>' >> $(APP_BUNDLE)/Contents/Info.plist
